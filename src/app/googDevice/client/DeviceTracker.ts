@@ -220,7 +220,7 @@ export class DeviceTracker extends BaseDeviceTracker<GoogDeviceDescriptor, never
         if (nameRow) {
             const nameCell = nameRow.querySelector('td:last-child') as HTMLTableCellElement;
             if (nameCell) {
-                const serial = device['ro.serialno'] || '';
+                const serial = device['ro.serialno'] || device.udid;
                 DeviceTracker.buildLabelCell(nameCell, serial, labels);
             }
         }
