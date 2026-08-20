@@ -1,0 +1,150 @@
+/* Stream + toolbar styles shared by the home-page bundle and the ws-scrcpy library bundle.
+ *
+ * This file is also loaded standalone by embed.html (which does NOT link app.css),
+ * so it must self-contain every theme variable the stream/toolbar styling depends on.
+ * Home-page callers (app.css) re-define the same variables — identical values, so
+ * the cascade harmless. Light-mode auto-detection uses prefers-color-scheme, but
+ * an explicit data-theme="light"/"dark" attribute on <html> wins.
+ */
+
+:root,
+[data-theme="dark"] {
+    --control-buttons-bg-color: #2d3741;
+    --svg-button-fill: #ffffff;
+    --svg-checkbox-bg-color: #10b981;
+}
+
+@media (prefers-color-scheme: light) {
+    :root:not([data-theme="dark"]) {
+        --control-buttons-bg-color: #f8f9fa;
+        --svg-button-fill: #495057;
+        --svg-checkbox-bg-color: #198754;
+    }
+}
+
+[data-theme="light"] {
+    --control-buttons-bg-color: #f8f9fa;
+    --svg-button-fill: #495057;
+    --svg-checkbox-bg-color: #198754;
+}
+
+/* Stream layout: device-view is a flex row (video | toolbar). Video cell uses
+ * CSS grid so the video-layer and touch-layer stack in the same cell — this
+ * replaces legacy position:absolute layers which broke parent auto-sizing.
+ * DOM order is toolbar-first; the toolbar uses `order: 1` to appear right.
+ *
+ * Defaults deliberately DO NOT use flex:1 — that would force the container to
+ * stretch to max height in fit-content parents (like the ConnectModal frame),
+ * leaving dead space below a smaller canvas. Full-body embed contexts that
+ * need the stream to fill the viewport opt in via body[data-embed-entry]
+ * below. */
+.device-view {
+    display: flex;
+    flex-direction: row;
+    min-width: 0;
+    min-height: 0;
+}
+
+.video {
+    display: grid;
+    min-width: 0;
+    min-height: 0;
+    place-items: center;
+    background-color: #000;
+    /* Grid layout + the canvas max-width/max-height caps control the displayed
+     * cell size with correct aspect; `.video` itself stays auto. The device
+     * resolution is exposed as the --video-width / --video-height custom props
+     * (set by the player's setScreenInfo) instead of an inline width/height, so
+     * no `!important` is needed to keep the cell auto-sized. (#106) */
+    width: auto;
+    height: auto;
+}
+
+/* Viewport-based max caps on the canvas layers. Canvas elements preserve
+ * intrinsic aspect ratio when both max-width and max-height are set, so these
+ * make the canvas shrink-to-fit the viewport while preserving the device
+ * aspect ratio. (The player's `calculateScreenInfoForBounds` never runs
+ * because `resizeVideoToBounds` is false on every subclass — so CSS alone
+ * has to do the sizing.) Modal context overrides these with narrower caps. */
+.video-layer {
+    grid-area: 1 / 1;
+    max-width: calc(100vw - 3.715rem);
+    max-height: 100vh;
+}
+
+.control-wrapper > input[type="checkbox"] {
+    display: none;
+}
+
+.control-wrapper > label.control-button {
+    display: block;
+    margin: 0.571rem auto;
+}
+
+.control-wrapper > input[type="checkbox"].two-images:checked + label > svg.image-on {
+    display: block;
+}
+
+.control-wrapper > input[type="checkbox"].two-images:not(:checked) + label > svg.image-on {
+    display: none;
+}
+
+.control-wrapper > input[type="checkbox"].two-images:checked + label > svg.image-off {
+    display: none;
+}
+
+.control-wrapper > input[type="checkbox"].two-images:not(:checked) + label > svg.image-off {
+    display: block;
+}
+
+.control-wrapper > input[type="checkbox"]:checked + label > svg {
+    fill: var(--svg-checkbox-bg-color);
+}
+
+.touch-layer {
+    grid-area: 1 / 1;
+    max-width: calc(100vw - 3.715rem);
+    max-height: 100vh;
+}
+
+.control-buttons-list {
+    flex-shrink: 0;
+    width: 3.715rem;
+    background-color: var(--control-buttons-bg-color);
+    order: 1; /* DOM order is toolbar-first, but we want video-left toolbar-right */
+}
+
+/* Embed page (embed.html) marks its body with data-embed-entry. The stream
+ * container fills the viewport, but the video cell itself stays content-sized
+ * so canvas + toolbar hug together as a pair — matches the legacy float:right
+ * look where the toolbar is flush against the mirror's right edge. Without
+ * justify-end the pair sits left and portrait devices leave the toolbar
+ * marooned at the far right. Modal contexts (fit-content frame) skip this. */
+body[data-embed-entry] .device-view {
+    flex: 1;
+    justify-content: flex-end;
+}
+
+.control-button {
+    margin: 0.571rem auto;
+    padding: 0;
+    display: block;
+    width: 2.143rem;
+    height: 2.143rem;
+    border: none;
+    opacity: 0.75;
+    background-color: var(--control-buttons-bg-color);
+    overflow: hidden;
+}
+
+.control-button:hover {
+    opacity: 1;
+}
+
+/* biome-ignore lint/style/noDescendingSpecificity: intentional source order; reordering would change the cascade */
+.control-button > svg {
+    fill: var(--svg-button-fill);
+    width: 100%;
+    height: 100%;
+    display: block;
+}
