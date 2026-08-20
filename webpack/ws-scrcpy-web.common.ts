@@ -118,7 +118,7 @@ const front: webpack.Configuration = {
     entry: path.join(PROJECT_ROOT, './src/app/index.ts'),
     externals: ['fs'],
     plugins: [
-        new MiniCssExtractPlugin({ filename: 'bundle.css' }),
+        new MiniCssExtractPlugin({ filename: 'bundle.annexb-v4.css', chunkFilename: '[id].annexb-v4.css' }),
         new CopyFilePlugin(
             path.resolve(PROJECT_ROOT, 'public/index.html'),
             path.resolve(CLIENT_DIST_PATH, 'index.html'),
@@ -136,7 +136,8 @@ const front: webpack.Configuration = {
         extensions: ['.tsx', '.ts', '.js'],
     },
     output: {
-        filename: 'bundle.js',
+        filename: 'bundle.annexb-v4.js',
+        chunkFilename: '[id].annexb-v4.js',
         path: CLIENT_DIST_PATH,
     },
     // Performance budget tuned for this app's footprint (scrcpy stream stack +
