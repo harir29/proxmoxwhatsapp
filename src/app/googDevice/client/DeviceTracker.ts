@@ -80,8 +80,19 @@ export class DeviceTracker extends BaseDeviceTracker<GoogDeviceDescriptor, never
     public static override readonly ACTION = ACTION.GOOG_DEVICE_LIST;
     public static readonly CREATE_DIRECT_LINKS = true;
     private static instancesByUrl: Map<string, DeviceTracker> = new Map();
+    private static autoConnectScheduled = false;
+    private static readonly DEFAULT_AUTO_CONNECT_UDID = '127.0.0.1:5555';
     protected static override tools: Set<Tool> = new Set();
     protected override tableId = 'goog_device_list';
+
+    private static shouldAutoConnect(udid: string): boolean {
+        const query = new URLSearchParams(location.search);
+        if (query.get('dashboard') === '1') {
+            return false;
+        }
+        const requestedDevice = query.get('device') || DeviceTracker.DEFAULT_AUTO_CONNECT_UDID;
+        return udid === requestedDevice;
+    }
 
     public static override start(hostItem: HostItem): DeviceTracker {
         const url = this.buildUrlForTracker(hostItem).toString();
@@ -420,6 +431,7 @@ export class DeviceTracker extends BaseDeviceTracker<GoogDeviceDescriptor, never
                 e.preventDefault();
                 const href = link.getAttribute('href');
                 if (!href) return;
+                const isAutomaticConnect = DeviceTracker.shouldAutoConnect(device.udid);
 
                 // Parse stream params from the URL hash
                 const url = new URL(href, location.origin);
@@ -447,6 +459,17 @@ export class DeviceTracker extends BaseDeviceTracker<GoogDeviceDescriptor, never
                     // audioCodec left unset → server uses scrcpy's opus default
                 }
 
+                // reDroid has no default Opus encoder, so unattended
+                // root-URL connections must remain video-only.
+                if (isAutomaticConnect) {
+                    params.audioEnabled = false;
+                    // This reDroid instance always uses its H.264 encoder.
+                    // Supplying the codec avoids a separate probe WebSocket
+                    // before opening the actual stream.
+                    params.videoCodec = 'h264';
+                    params.encoderName = undefined;
+                }
+
                 // Get device label from the card
                 const nameEl = link.closest('.device')?.querySelector('.device-name-text');
                 const label = nameEl?.textContent || device['ro.product.model'] || device.udid;
@@ -463,7 +486,21 @@ export class DeviceTracker extends BaseDeviceTracker<GoogDeviceDescriptor, never
 
                 const { ConnectModal } = await import('./ConnectModal');
                 new ConnectModal(params, player, fitToScreen, videoSettings, label, device.deviceKind);
+
+                if (isAutomaticConnect) {
+                    document.body.classList.add('auto-stream-active');
+                }
             });
+
+            if (
+                !DeviceTracker.autoConnectScheduled &&
+                DeviceTracker.shouldAutoConnect(device.udid) &&
+                link.getAttribute('href')
+            ) {
+                DeviceTracker.autoConnectScheduled = true;
+                document.body.classList.add('auto-stream-loading');
+                window.setTimeout(() => link.click(), 0);
+            }
         });
     }
 

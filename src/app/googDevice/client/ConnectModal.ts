@@ -10,16 +10,17 @@ export class ConnectModal extends Modal {
 
     constructor(
         params: ParamsStreamScrcpy,
-        _player: BasePlayer,
-        _fitToScreen: boolean,
-        videoSettings: VideoSettings,
+        _player: BasePlayer | undefined,
+        _fitToScreen: boolean | undefined,
+        videoSettings: VideoSettings | undefined,
         deviceLabel: string,
         deviceKind?: 'phone' | 'tablet' | 'tv',
+        private readonly onClosed?: (() => void) | undefined,
     ) {
         super({ title: deviceLabel });
         this.dialog.classList.add('connect-modal');
 
-        const bounds = videoSettings.bounds;
+        const bounds = videoSettings?.bounds;
         const maxDim = bounds ? Math.max(bounds.width, bounds.height) : 0;
         const maxSize = maxDim > 0 ? maxDim : undefined;
 
@@ -32,8 +33,8 @@ export class ConnectModal extends Modal {
             pathname: params.pathname || undefined,
             codec,
             encoder: params.encoderName,
-            bitrate: videoSettings.bitrate || undefined,
-            maxFps: videoSettings.maxFps || undefined,
+            bitrate: videoSettings?.bitrate || undefined,
+            maxFps: videoSettings?.maxFps || undefined,
             maxSize,
             audio: params.audioEnabled,
             audioSource: params.audioSource,
@@ -72,6 +73,7 @@ export class ConnectModal extends Modal {
     protected override onBeforeClose(): void {
         this.handle?.stop();
         this.handle = undefined;
+        this.onClosed?.();
     }
 }
 

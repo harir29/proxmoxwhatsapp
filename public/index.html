@@ -5,9 +5,47 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Android Power Tools</title>
     <link rel="icon" type="image/png" href="favicon.png">
-    <link rel="stylesheet" href="bundle.annexb-v6.css">
+    <link rel="stylesheet" href="bundle.annexb-v14.css">
 </head>
-<body>
-    <script src="bundle.annexb-v6.js"></script>
+<body class="auto-stream-loading">
+    <div
+        id="auto-stream-cover"
+        role="status"
+        aria-live="polite"
+        style="
+            position:fixed;
+            inset:0;
+            z-index:2147483646;
+            background:rgb(238,241,245);
+            display:flex;
+            flex-direction:column;
+            align-items:center;
+            justify-content:center;
+            gap:18px;
+            color:rgb(45,52,64);
+            font-family:system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+        "
+    >
+        <style>
+            @keyframes auto-stream-spin {
+                to { transform: rotate(360deg); }
+            }
+        </style>
+        <div
+            aria-hidden="true"
+            style="
+                width:44px;
+                height:44px;
+                border:4px solid rgba(16,185,129,0.22);
+                border-top-color:rgb(16,185,129);
+                border-radius:50%;
+                animation:auto-stream-spin 0.8s linear infinite;
+            "
+        ></div>
+        <div style="font-size:17px;font-weight:600;letter-spacing:0.01em">
+            Opening WhatsApp…
+        </div>
+    </div>
+    <script src="bundle.annexb-v14.js"></script>
 </body>
 </html>

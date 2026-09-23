@@ -18,6 +18,45 @@ import { StreamClientScrcpy } from './googDevice/client/StreamClientScrcpy';
 import { installThemeEmbedListener, notifyThemeReady } from './public/themeEmbed';
 import { onPageTeardown } from './util/onPageTeardown';
 
+// Hide the management dashboard while the default reDroid stream opens.
+const startupParams = new URLSearchParams(location.search);
+const autoStreamCover = document.getElementById('auto-stream-cover');
+
+const revealAutoStreamDashboard = (): void => {
+    autoStreamCover?.remove();
+    document.body.classList.remove('auto-stream-loading', 'auto-stream-active');
+};
+
+const shouldAutoStream =
+    startupParams.get('dashboard') !== '1' &&
+    startupParams.get('resume') !== 'uninstall-service';
+
+if (shouldAutoStream) {
+    document.body.classList.add('auto-stream-loading');
+
+    // Reveal the dashboard if the device cannot be opened.
+    window.setTimeout(() => {
+        if (!document.querySelector('dialog.modal[open]')) {
+            revealAutoStreamDashboard();
+        }
+    }, 20_000);
+
+    // If the stream dialog is closed or disconnected, reveal management UI.
+    document.addEventListener(
+        'close',
+        () => {
+            window.setTimeout(() => {
+                if (!document.querySelector('dialog.modal[open]')) {
+                    revealAutoStreamDashboard();
+                }
+            }, 0);
+        },
+        true,
+    );
+} else {
+    revealAutoStreamDashboard();
+}
+
 function isResumingUninstall(): boolean {
     const params = new URLSearchParams(location.search);
     return params.get('resume') === 'uninstall-service' && Boolean(params.get('token'));
@@ -274,6 +313,57 @@ window.onload = async (): Promise<void> => {
     // WebCodecs player must be registered so ConnectModal can find it
     const { WebCodecsPlayer } = await import('./player/WebCodecsPlayer');
     StreamClientScrcpy.registerPlayer(WebCodecsPlayer);
+
+    // The normal root URL is a dedicated reDroid/WhatsApp entry point.
+    // Start it directly instead of waiting for HostTracker to discover the
+    // device and construct a dashboard card. ?dashboard=1 retains the full UI.
+    const directStream =
+        !action &&
+        startupParams.get('dashboard') !== '1' &&
+        startupParams.get('resume') !== 'uninstall-service';
+
+    if (directStream) {
+        const udid = startupParams.get('device') || '127.0.0.1:5555';
+        const label = startupParams.get('label') || 'WhatsApp Test 01';
+
+        try {
+            const params = StreamClientScrcpy.parseParameters(
+                new URLSearchParams({
+                    action: StreamClientScrcpy.ACTION,
+                    player: WebCodecsPlayer.playerFullName,
+                    udid,
+                }),
+            );
+            params.videoCodec = 'h264';
+            params.encoderName = undefined;
+            params.audioEnabled = false;
+
+            const { ConnectModal } = await import('./googDevice/client/ConnectModal');
+            new ConnectModal(
+                params,
+                undefined,
+                undefined,
+                undefined,
+                label,
+                'phone',
+                () => {
+                    window.location.assign(
+                        `${window.location.pathname}?dashboard=1`,
+                    );
+                },
+            );
+
+            document.body.classList.remove('auto-stream-loading');
+            document.body.classList.add('auto-stream-active');
+            document.getElementById('auto-stream-cover')?.remove();
+            return;
+        } catch (error) {
+            console.error('[boot] Direct WhatsApp startup failed', error);
+            document.body.classList.remove('auto-stream-loading', 'auto-stream-active');
+            document.getElementById('auto-stream-cover')?.remove();
+            // Continue below and build the management dashboard.
+        }
+    }
 
     const tools: Tool[] = [];
 

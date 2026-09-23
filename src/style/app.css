@@ -140,3 +140,17 @@ body.stream {
 .wait {
     cursor: wait;
 }
+
+
+/* Early auto-stream cover: loaded with the main stylesheet. */
+body.auto-stream-loading::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    z-index: 2147483646;
+    background: rgb(20, 22, 26);
+}
+
+[data-theme="light"] body.auto-stream-loading::before {
+    background: rgb(238, 241, 245);
+}
