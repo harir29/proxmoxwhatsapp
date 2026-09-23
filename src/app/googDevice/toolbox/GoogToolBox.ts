@@ -55,24 +55,20 @@ export class GoogToolBox extends ToolBox {
     ): GoogToolBox {
         const playerName = player.getName();
         const list = BUTTONS.slice();
-        const handler = <K extends keyof HTMLElementEventMap, T extends HTMLElement>(
-            type: K,
-            element: ToolBoxElement<T>,
-        ) => {
-            if (!element.optional?.['code']) {
-                return;
-            }
-            const { code } = element.optional;
-            const action = type === 'mousedown' ? KeyEvent.ACTION_DOWN : KeyEvent.ACTION_UP;
-            const event = new KeyCodeControlMessage(action, code, 0, 0);
-            client.sendMessage(event);
-        };
         const elements: ToolBoxElement<any>[] = list.map((item) => {
             const button = new ToolBoxButton(item.title, item.icon, {
                 code: item.code,
             });
-            button.addEventListener('mousedown', handler);
-            button.addEventListener('mouseup', handler);
+            // Emit a complete Android key press from one browser click.
+            button.getElement().addEventListener('click', (event) => {
+                event.preventDefault();
+                client.sendMessage(
+                    new KeyCodeControlMessage(KeyEvent.ACTION_DOWN, item.code, 0, 0),
+                );
+                client.sendMessage(
+                    new KeyCodeControlMessage(KeyEvent.ACTION_UP, item.code, 0, 0),
+                );
+            });
             return button;
         });
         if (player.supportsScreenshot) {
