@@ -7,17 +7,23 @@ export type RequestParameters = {
     request: http.IncomingMessage;
     url: URL;
     action: string;
+    userId: number;
 };
 
 export interface MwFactory {
     processRequest(ws: WS, params: RequestParameters): Mw | undefined;
-    processChannel(ws: Multiplexer, code: string, data?: ArrayBuffer): Mw | undefined;
+    processChannel(ws: Multiplexer, code: string, data: ArrayBuffer | undefined, userId: number): Mw | undefined;
 }
 
 export abstract class Mw {
     protected name = 'Mw';
 
-    public static processChannel(_ws: Multiplexer, _code: string, _data?: ArrayBuffer): Mw | undefined {
+    public static processChannel(
+        _ws: Multiplexer,
+        _code: string,
+        _data?: ArrayBuffer,
+        _userId?: number,
+    ): Mw | undefined {
         return;
     }
 

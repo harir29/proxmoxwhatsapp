@@ -65,4 +65,22 @@ describe('SettingsApi', () => {
         expect(db.devices.getAllLabels(IMPLICIT_ADMIN_ID)).toEqual({});
         expect(db.devices.getDeviceSettings(IMPLICIT_ADMIN_ID, 'UDID1')).toEqual({});
     });
+
+    it('denies per-device settings for a device not assigned to the user', async () => {
+        setup();
+        const db = Config.getInstance().db;
+        const user = db.users.create({ username: 'user1', role: 'user', passwordHash: null });
+        db.deviceAccess.assign(user.id, '127.0.0.1:5555', true);
+        const api = new SettingsApi();
+
+        const denied = makeReqRes('GET', '/api/settings/device?udid=127.0.0.1%3A5556');
+        (denied.req as typeof denied.req & { user: { id: number } }).user = { id: user.id };
+        await api.handle(denied.req, denied.res);
+        expect(denied.getStatus()).toBe(403);
+
+        const allowed = makeReqRes('GET', '/api/settings/device?udid=127.0.0.1%3A5555');
+        (allowed.req as typeof allowed.req & { user: { id: number } }).user = { id: user.id };
+        await api.handle(allowed.req, allowed.res);
+        expect(allowed.getStatus()).toBe(200);
+    });
 });

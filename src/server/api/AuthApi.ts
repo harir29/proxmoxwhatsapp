@@ -1,5 +1,13 @@
 import type { IncomingMessage, ServerResponse } from 'http';
-import { isAuthEnabled, parseCookie, SESSION_COOKIE, setAuthEnabled } from '../auth/authState';
+import {
+    isAccessControlEnabled,
+    parseCookie,
+    SESSION_COOKIE,
+    sessionCookie,
+    setAuthEnabled,
+} from '../auth/authState';
+import { OidcService } from '../auth/OidcService';
+import { isOidcEnabled } from '../auth/oidcConfig';
 import { resolveUserId } from '../auth/currentUser';
 import { login } from '../auth/loginService';
 import { hashPassword, verifyPassword } from '../auth/password';
@@ -21,16 +29,74 @@ export class AuthApi {
 
         const db = Config.getInstance().db;
 
+        if (req.method === 'GET' && pathname === '/api/auth/oidc/login') {
+            if (!isOidcEnabled(db)) {
+                sendJson(res, 404, { error: 'OIDC is not enabled' });
+                return true;
+            }
+            const url = new URL(req.url ?? '/', 'http://localhost');
+            try {
+                const location = await OidcService.getInstance().authorizationUrl(db, url.searchParams.get('returnTo'));
+                res.writeHead(302, { location, 'cache-control': 'no-store' });
+                res.end();
+            } catch {
+                sendJson(res, 503, { error: 'identity provider unavailable' });
+            }
+            return true;
+        }
+
+        if (req.method === 'GET' && pathname === '/api/auth/oidc/callback') {
+            const url = new URL(req.url ?? '/', 'http://localhost');
+            const code = url.searchParams.get('code') || '';
+            const state = url.searchParams.get('state') || '';
+            if (!code || !state || url.searchParams.has('error')) {
+                sendJson(res, 400, { error: 'OIDC login was not completed' });
+                return true;
+            }
+            try {
+                const result = await OidcService.getInstance().completeCallback(db, code, state);
+                const token = new SessionStore(db.sqlite).create(result.user.id, Date.now());
+                const forwardedProto = req.headers['x-forwarded-proto'];
+                const secure =
+                    Boolean((req.socket as { encrypted?: boolean } | undefined)?.encrypted) ||
+                    (typeof forwardedProto === 'string' && forwardedProto.split(',')[0]?.trim() === 'https');
+                res.setHeader('Set-Cookie', sessionCookie(token, secure));
+                res.writeHead(302, { location: result.returnTo, 'cache-control': 'no-store' });
+                res.end();
+            } catch {
+                sendJson(res, 403, { error: 'OIDC login failed or account is not authorized' });
+            }
+            return true;
+        }
+
+        if (req.method === 'GET' && pathname === '/api/auth/oidc/logout') {
+            const token = parseCookie(req.headers.cookie)[SESSION_COOKIE];
+            if (token) new SessionStore(db.sqlite).delete(token);
+            res.setHeader('Set-Cookie', sessionCookie('', true, 0));
+            try {
+                const location = await OidcService.getInstance().logoutUrl(db);
+                res.writeHead(302, { location, 'cache-control': 'no-store' });
+                res.end();
+            } catch {
+                res.writeHead(302, { location: '/' });
+                res.end();
+            }
+            return true;
+        }
+
         if (req.method === 'POST' && pathname === '/api/auth/login') {
             const body = await readJsonBody(req);
             const username = typeof body['username'] === 'string' ? body['username'] : '';
             const password = typeof body['password'] === 'string' ? body['password'] : '';
             const result = login(db, username, password, Date.now());
             if (result.ok) {
-                const secure = Boolean((req.socket as { encrypted?: boolean } | undefined)?.encrypted);
+                const forwardedProto = req.headers['x-forwarded-proto'];
+                const secure =
+                    Boolean((req.socket as { encrypted?: boolean } | undefined)?.encrypted) ||
+                    (typeof forwardedProto === 'string' && forwardedProto.split(',')[0]?.trim() === 'https');
                 res.setHeader(
                     'Set-Cookie',
-                    `${SESSION_COOKIE}=${result.token}; HttpOnly; SameSite=Lax; Path=/${secure ? '; Secure' : ''}`,
+                    sessionCookie(result.token, secure),
                 );
                 sendJson(res, 200, { ok: true });
             } else {
@@ -42,17 +108,22 @@ export class AuthApi {
         if (req.method === 'POST' && pathname === '/api/auth/logout') {
             const token = parseCookie(req.headers.cookie)[SESSION_COOKIE];
             if (token) new SessionStore(db.sqlite).delete(token);
-            res.setHeader('Set-Cookie', `${SESSION_COOKIE}=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0`);
+            const forwardedProto = req.headers['x-forwarded-proto'];
+            const secure =
+                Boolean((req.socket as { encrypted?: boolean } | undefined)?.encrypted) ||
+                (typeof forwardedProto === 'string' && forwardedProto.split(',')[0]?.trim() === 'https');
+            res.setHeader('Set-Cookie', sessionCookie('', secure, 0));
             sendJson(res, 200, { ok: true });
             return true;
         }
 
         if (req.method === 'GET' && pathname === '/api/auth/me') {
             // ALLOW-LISTED route → self-validate the cookie (AuthGate did not attach req.user here).
-            if (!isAuthEnabled(db)) {
+            if (!isAccessControlEnabled(db)) {
                 const admin = db.users.getById(IMPLICIT_ADMIN_ID);
                 sendJson(res, 200, {
                     authEnabled: false,
+                    oidcEnabled: false,
                     user: admin ? { username: admin.username, role: admin.role } : null,
                 });
                 return true;
@@ -60,7 +131,15 @@ export class AuthApi {
             const token = parseCookie(req.headers.cookie)[SESSION_COOKIE];
             const session = token ? new SessionStore(db.sqlite).findValid(token, Date.now()) : undefined;
             const user = session ? db.users.getById(session.userId) : undefined;
-            sendJson(res, 200, { authEnabled: true, user: user ? { username: user.username, role: user.role } : null });
+            const assignments = user ? db.deviceAccess.listForUser(user.id) : [];
+            sendJson(res, 200, {
+                authEnabled: true,
+                oidcEnabled: isOidcEnabled(db),
+                user: user ? { id: user.id, username: user.username, role: user.role } : null,
+                devices: user?.role === 'admin' ? [] : assignments.map((assignment) => assignment.udid),
+                defaultDevice:
+                    !user || user.role === 'admin' ? null : db.deviceAccess.defaultForUser(user.id) || null,
+            });
             return true;
         }
 

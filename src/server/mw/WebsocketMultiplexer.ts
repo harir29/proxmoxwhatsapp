@@ -15,11 +15,11 @@ export class WebsocketMultiplexer extends Mw {
         if (action !== ACTION.MULTIPLEX) {
             return;
         }
-        return this.createMultiplexer(ws);
+        return this.createMultiplexer(ws, params.userId);
     }
 
-    public static createMultiplexer(ws: WS): WebsocketMultiplexer {
-        const service = new WebsocketMultiplexer(ws);
+    public static createMultiplexer(ws: WS, userId: number): WebsocketMultiplexer {
+        const service = new WebsocketMultiplexer(ws, userId);
         const log = Logger.for(this.TAG);
         service.init().catch((e) => {
             const msg = `Failed to start service: ${e.message}`;
@@ -29,13 +29,16 @@ export class WebsocketMultiplexer extends Mw {
         return service;
     }
 
-    constructor(ws: WS) {
+    constructor(
+        ws: WS,
+        private readonly userId: number,
+    ) {
         super(ws);
         this.multiplexer = Multiplexer.wrap(ws as unknown as WebSocket);
     }
 
     public async init(): Promise<void> {
-        this.multiplexer.addEventListener('channel', this.onChannel);
+        this.multiplexer.addEventListener('channel', this.onChannel.bind(this));
     }
 
     public static registerMw(mwFactory: MwFactory): void {
@@ -57,7 +60,7 @@ export class WebsocketMultiplexer extends Mw {
             // commented-out cleanup (this.mw.add/remove on channel close/error
             // events) is the intended-future-feature placeholder, not active
             // cleanup. No resource to dispose here today.
-            const mw = mwFactory.processChannel(channel, code, buffer);
+            const mw = mwFactory.processChannel(channel, code, buffer, this.userId);
             if (mw) {
                 processed = true;
                 // this.mw.add(mw);

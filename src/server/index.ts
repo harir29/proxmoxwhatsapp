@@ -245,7 +245,14 @@ if (__ssArgs) {
                 WebsocketMultiplexer.registerMw(mwFactory);
             });
 
-            wsService.registerPathHandler(SCAN_WS_PATH, (ws, userId) => ScanMw.attach(ws, userId));
+            wsService.registerPathHandler(SCAN_WS_PATH, (ws, userId) => {
+                const user = Config.getInstance().db.users.getById(userId);
+                if (user?.role !== 'admin') {
+                    ws.close(4403, 'admin access required');
+                    return;
+                }
+                ScanMw.attach(ws, userId);
+            });
 
             // v0.1.9: auto-open browser on FIRST run, but only when this
             // is a normal user instance (not running as a service —

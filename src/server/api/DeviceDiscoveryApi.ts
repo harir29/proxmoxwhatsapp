@@ -1,6 +1,8 @@
 import type { IncomingMessage, ServerResponse } from 'http';
 import { AdbClient, parseSerialFromMdnsName } from '../AdbClient';
 import { resolveUserId } from '../auth/currentUser';
+import { requireDeviceAccess } from '../auth/deviceAccess';
+import { requireAdmin } from '../auth/requireAdmin';
 import { Config } from '../Config';
 import { Logger } from '../Logger';
 import { resolveMac } from '../network/MacResolver';
@@ -26,6 +28,7 @@ export class DeviceDiscoveryApi {
 
         try {
             if (req.method === 'POST' && url === '/api/devices/scan') {
+                if (!requireAdmin(req, res)) return true;
                 const discovered = await this.adbClient.mdnsServices();
                 const connectable = discovered.filter(
                     (d) => d.service.includes('_adb') && !d.service.includes('pairing'),
@@ -66,6 +69,7 @@ export class DeviceDiscoveryApi {
             }
 
             if (req.method === 'GET' && url === '/api/devices/scan/subnet') {
+                if (!requireAdmin(req, res)) return true;
                 const detected = await detectSubnet();
                 res.writeHead(200);
                 res.end(JSON.stringify(detected));
@@ -73,6 +77,7 @@ export class DeviceDiscoveryApi {
             }
 
             if (req.method === 'POST' && url === '/api/devices/connect') {
+                if (!requireAdmin(req, res)) return true;
                 const { address, serial, label } = await readJsonBodyStrict<{
                     address?: string;
                     serial?: string;
@@ -83,6 +88,7 @@ export class DeviceDiscoveryApi {
                     res.end(JSON.stringify({ error: 'address is required' }));
                     return true;
                 }
+                if (!requireDeviceAccess(req, res, address)) return true;
                 const db = Config.getInstance().db;
                 const userId = resolveUserId(req);
                 // mDNS path: serial is known upfront, save the label before connecting.
@@ -129,6 +135,7 @@ export class DeviceDiscoveryApi {
                     res.end(JSON.stringify({ error: 'address is required' }));
                     return true;
                 }
+                if (!requireDeviceAccess(req, res, address)) return true;
                 const result = await this.adbClient.disconnect(address);
                 const success = result.includes('disconnected');
                 res.writeHead(success ? 200 : 500);
@@ -144,6 +151,7 @@ export class DeviceDiscoveryApi {
                     res.end(JSON.stringify({ error: 'udid is required' }));
                     return true;
                 }
+                if (!requireDeviceAccess(req, res, udid)) return true;
                 const output = await this.adbClient.shell(udid, 'dumpsys power 2>/dev/null | grep mWakefulness');
                 const awake = output.includes('Awake');
                 res.writeHead(200);
@@ -158,6 +166,7 @@ export class DeviceDiscoveryApi {
                     res.end(JSON.stringify({ error: 'udid and action are required' }));
                     return true;
                 }
+                if (!requireDeviceAccess(req, res, udid)) return true;
                 const keyevent = action === 'sleep' ? 223 : 224;
                 await this.adbClient.shell(udid, `input keyevent ${keyevent}`);
                 // Re-check state after a brief delay for the device to respond
@@ -183,6 +192,7 @@ export class DeviceDiscoveryApi {
                     res.end(JSON.stringify({ error: 'serial is required' }));
                     return true;
                 }
+                if (!requireDeviceAccess(req, res, serial)) return true;
                 const db = Config.getInstance().db;
                 const userId = resolveUserId(req);
                 if (label) {
@@ -202,6 +212,7 @@ export class DeviceDiscoveryApi {
                     res.end(JSON.stringify({ error: 'udid is required' }));
                     return true;
                 }
+                if (!requireDeviceAccess(req, res, udid)) return true;
                 let safePaths: string[];
                 try {
                     // Bound + validate the targets before any privileged delete:

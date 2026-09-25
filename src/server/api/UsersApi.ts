@@ -33,9 +33,44 @@ export class UsersApi {
                 disabled: u.disabled,
                 lockedUntil: u.lockedUntil,
                 lastLogin: u.lastLoginAt,
+                oidcLinked: u.oidcIssuer !== null,
+                devices: db.deviceAccess.listForUser(u.id).map((assignment) => ({
+                    udid: assignment.udid,
+                    isDefault: assignment.isDefault,
+                })),
             }));
             sendJson(res, 200, { users });
             return true;
+        }
+
+        const assignmentMatch = pathname.match(/^\/api\/users\/(\d+)\/devices$/);
+        if (assignmentMatch) {
+            const id = Number(assignmentMatch[1]);
+            const target = db.users.getById(id);
+            if (!target) {
+                sendJson(res, 404, { error: 'no such user' });
+                return true;
+            }
+            if (req.method === 'GET') {
+                sendJson(res, 200, { devices: db.deviceAccess.listForUser(id) });
+                return true;
+            }
+            const body = await readJsonBody(req);
+            const udid = typeof body['udid'] === 'string' ? body['udid'].trim() : '';
+            if (!udid) {
+                sendJson(res, 400, { error: 'udid is required' });
+                return true;
+            }
+            if (req.method === 'PUT') {
+                db.deviceAccess.assign(id, udid, body['isDefault'] === true);
+                sendJson(res, 200, { devices: db.deviceAccess.listForUser(id) });
+                return true;
+            }
+            if (req.method === 'DELETE') {
+                db.deviceAccess.revoke(id, udid);
+                sendJson(res, 200, { devices: db.deviceAccess.listForUser(id) });
+                return true;
+            }
         }
 
         if (req.method === 'POST' && pathname === '/api/users') {

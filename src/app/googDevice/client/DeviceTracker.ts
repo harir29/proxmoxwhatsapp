@@ -87,7 +87,7 @@ export class DeviceTracker extends BaseDeviceTracker<GoogDeviceDescriptor, never
 
     private static shouldAutoConnect(udid: string): boolean {
         const query = new URLSearchParams(location.search);
-        if (query.get('dashboard') === '1') {
+        if (query.get('dashboard') === '1' || document.body.dataset['disableAutoConnect'] === 'true') {
             return false;
         }
         const requestedDevice = query.get('device') || DeviceTracker.DEFAULT_AUTO_CONNECT_UDID;

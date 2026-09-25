@@ -4,6 +4,7 @@ import * as path from 'path';
 import { AppSettingsStore } from './AppSettingsStore';
 import { DB_FILENAME } from './constants';
 import { DeviceStore } from './DeviceStore';
+import { DeviceAccessStore } from './DeviceAccessStore';
 import { openDatabase } from './openDatabase';
 import { UserSettingsStore } from './UserSettingsStore';
 import { UserStore } from './UserStore';
@@ -15,6 +16,7 @@ export class Db {
     public readonly userSettings: UserSettingsStore;
     public readonly appSettings: AppSettingsStore;
     public readonly devices: DeviceStore;
+    public readonly deviceAccess: DeviceAccessStore;
 
     private constructor(
         private readonly handle: DatabaseSync,
@@ -24,6 +26,7 @@ export class Db {
         this.userSettings = new UserSettingsStore(handle);
         this.appSettings = new AppSettingsStore(handle);
         this.devices = new DeviceStore(handle);
+        this.deviceAccess = new DeviceAccessStore(handle);
     }
 
     /** Open (or recover) <dataRoot>/wsscrcpy.db and expose the repos. */

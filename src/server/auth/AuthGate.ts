@@ -1,6 +1,7 @@
 import type { IncomingMessage, ServerResponse } from 'http';
 import type { Db } from '../db/Db';
-import { isAllowlisted, isAuthEnabled, parseCookie, SESSION_COOKIE } from './authState';
+import { isAccessControlEnabled, isAllowlisted, parseCookie, SESSION_COOKIE } from './authState';
+import { isOidcEnabled } from './oidcConfig';
 import { SessionStore } from './session';
 
 // Minimal, self-contained login page served inline for unauthenticated navigations in locked
@@ -31,7 +32,7 @@ export class AuthGate {
 
     async handle(req: IncomingMessage, res: ServerResponse): Promise<boolean> {
         const db = this.getDb();
-        if (!isAuthEnabled(db)) return false; // open mode → not our concern
+        if (!isAccessControlEnabled(db)) return false; // open mode → not our concern
 
         const url = new URL(req.url ?? '/', 'http://localhost');
         if (isAllowlisted(url.pathname)) return false;
@@ -45,6 +46,10 @@ export class AuthGate {
             if (url.pathname.startsWith('/api/')) {
                 res.writeHead(401, { 'content-type': 'application/json' });
                 res.end(JSON.stringify({ error: 'unauthorized' }));
+            } else if (isOidcEnabled(db)) {
+                const returnTo = `${url.pathname}${url.search}`;
+                res.writeHead(302, { location: `/api/auth/oidc/login?returnTo=${encodeURIComponent(returnTo)}` });
+                res.end();
             } else {
                 // Serve the login page INLINE — never redirect to /login (that would fall through
                 // to the static handler's index.html SPA fallback and leak the gated app shell).

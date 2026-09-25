@@ -13,6 +13,8 @@ export interface User {
     lockedUntil: number | null;
     createdAt: number;
     lastLoginAt: number | null;
+    oidcIssuer: string | null;
+    oidcSubject: string | null;
 }
 
 // NOTE: a `type` alias (not `interface`) so it gains an implicit index signature
@@ -29,6 +31,8 @@ type UserRow = {
     locked_until: number | null;
     created_at: number;
     last_login_at: number | null;
+    oidc_issuer: string | null;
+    oidc_subject: string | null;
 };
 
 function toUser(r: UserRow): User {
@@ -43,11 +47,13 @@ function toUser(r: UserRow): User {
         lockedUntil: r.locked_until,
         createdAt: r.created_at,
         lastLoginAt: r.last_login_at,
+        oidcIssuer: r.oidc_issuer,
+        oidcSubject: r.oidc_subject,
     };
 }
 
 const COLS =
-    'id, username, role, password_hash, disabled, failed_attempts, lockout_window_start, locked_until, created_at, last_login_at';
+    'id, username, role, password_hash, disabled, failed_attempts, lockout_window_start, locked_until, created_at, last_login_at, oidc_issuer, oidc_subject';
 
 export class UserStore {
     constructor(private readonly db: DatabaseSync) {}
@@ -62,6 +68,13 @@ export class UserStore {
         return r ? toUser(r) : undefined;
     }
 
+    getByOidcIdentity(issuer: string, subject: string): User | undefined {
+        const r = this.db
+            .prepare(`SELECT ${COLS} FROM users WHERE oidc_issuer = ? AND oidc_subject = ?`)
+            .get(issuer, subject) as UserRow | undefined;
+        return r ? toUser(r) : undefined;
+    }
+
     list(): User[] {
         return (this.db.prepare(`SELECT ${COLS} FROM users ORDER BY id`).all() as UserRow[]).map(toUser);
     }
@@ -72,6 +85,20 @@ export class UserStore {
             .prepare('INSERT INTO users (username, role, password_hash, created_at) VALUES (?, ?, ?, ?)')
             .run(input.username, input.role, input.passwordHash, now);
         return this.getById(Number(info.lastInsertRowid))!;
+    }
+
+    createOidc(input: { username: string; role: Role; issuer: string; subject: string }): User {
+        const now = Date.now();
+        const info = this.db
+            .prepare(
+                'INSERT INTO users (username, role, password_hash, created_at, oidc_issuer, oidc_subject) VALUES (?, ?, NULL, ?, ?, ?)',
+            )
+            .run(input.username, input.role, now, input.issuer, input.subject);
+        return this.getById(Number(info.lastInsertRowid))!;
+    }
+
+    linkOidcIdentity(id: number, issuer: string, subject: string): void {
+        this.db.prepare('UPDATE users SET oidc_issuer = ?, oidc_subject = ? WHERE id = ?').run(issuer, subject, id);
     }
 
     setPasswordHash(id: number, hash: string): void {

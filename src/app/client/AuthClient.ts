@@ -8,6 +8,7 @@ const JSON_HEADERS = { 'content-type': 'application/json' };
 export type Role = 'user' | 'admin';
 export interface MeResponse {
     authEnabled: boolean;
+    oidcEnabled?: boolean;
     user: { username: string; role: Role } | null;
 }
 export interface UserRow {
@@ -33,7 +34,11 @@ class AuthClient {
         });
         return res.ok;
     }
-    async logout(): Promise<void> {
+    async logout(oidc = false): Promise<void> {
+        if (oidc) {
+            window.location.assign('/api/auth/oidc/logout');
+            return;
+        }
         await fetch('/api/auth/logout', { method: 'POST' });
     }
     async changePassword(currentPassword: string, newPassword: string): Promise<boolean> {

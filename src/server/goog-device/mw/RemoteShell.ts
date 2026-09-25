@@ -7,6 +7,7 @@ import type { Multiplexer } from '../../../packages/multiplexer/Multiplexer';
 import type { Message } from '../../../types/Message';
 import type { XtermClientMessage, XtermServiceParameters } from '../../../types/XtermMessage';
 import { Config } from '../../Config';
+import { canAccessDevice } from '../../auth/deviceAccess';
 import { Logger } from '../../Logger';
 import { Mw, type RequestParameters } from '../../mw/Mw';
 import { getNodePty } from '../../NodePtyResolver';
@@ -85,21 +86,29 @@ export class RemoteShell extends Mw {
     private closeCode = 1000;
     private closeReason = '';
 
-    public static override processChannel(ws: Multiplexer, code: string): Mw | undefined {
+    public static override processChannel(
+        ws: Multiplexer,
+        code: string,
+        _data: ArrayBuffer | undefined,
+        userId: number,
+    ): Mw | undefined {
         if (code !== ChannelCode.SHEL) {
             return;
         }
-        return new RemoteShell(ws);
+        return new RemoteShell(ws, userId);
     }
 
     public static override processRequest(ws: WS, params: RequestParameters): RemoteShell | undefined {
         if (params.action !== ACTION.SHELL) {
             return;
         }
-        return new RemoteShell(ws);
+        return new RemoteShell(ws, params.userId);
     }
 
-    constructor(protected override ws: WS | Multiplexer) {
+    constructor(
+        protected override ws: WS | Multiplexer,
+        private readonly userId: number,
+    ) {
         super(ws);
     }
 
@@ -172,6 +181,10 @@ export class RemoteShell extends Mw {
         const data: XtermClientMessage = message.data as XtermClientMessage;
         const { type } = data;
         if (type === 'start') {
+            if (!canAccessDevice(this.userId, data.udid)) {
+                this.ws.close(4403, 'device access denied');
+                return;
+            }
             this.term = this.createTerminal(data);
             this.initialized = true;
         }

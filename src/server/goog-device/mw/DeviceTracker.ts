@@ -7,6 +7,7 @@ import type { DeviceTrackerEvent } from '../../../types/DeviceTrackerEvent';
 import type { DeviceTrackerEventList } from '../../../types/DeviceTrackerEventList';
 import type GoogDeviceDescriptor from '../../../types/GoogDeviceDescriptor';
 import { Logger } from '../../Logger';
+import { canAccessDevice } from '../../auth/deviceAccess';
 import { Mw, type RequestParameters } from '../../mw/Mw';
 import { ControlCenter } from '../services/ControlCenter';
 
@@ -17,21 +18,29 @@ export class DeviceTracker extends Mw {
     private adt: ControlCenter = ControlCenter.getInstance();
     private readonly id: string;
 
-    public static override processChannel(ws: Multiplexer, code: string): Mw | undefined {
+    public static override processChannel(
+        ws: Multiplexer,
+        code: string,
+        _data: ArrayBuffer | undefined,
+        userId: number,
+    ): Mw | undefined {
         if (code !== ChannelCode.GTRC) {
             return;
         }
-        return new DeviceTracker(ws);
+        return new DeviceTracker(ws, userId);
     }
 
     public static override processRequest(ws: WS, params: RequestParameters): DeviceTracker | undefined {
         if (params.action !== ACTION.GOOG_DEVICE_LIST) {
             return;
         }
-        return new DeviceTracker(ws);
+        return new DeviceTracker(ws, params.userId);
     }
 
-    constructor(ws: WS | Multiplexer) {
+    constructor(
+        ws: WS | Multiplexer,
+        private readonly userId: number,
+    ) {
         super(ws);
 
         this.id = this.adt.getId();
@@ -39,7 +48,7 @@ export class DeviceTracker extends Mw {
             .init()
             .then(() => {
                 this.adt.on('device', this.sendDeviceMessage);
-                this.buildAndSendMessage(this.adt.getDevices());
+                this.buildAndSendMessage(this.adt.getDevices().filter((device) => this.canAccess(device.udid)));
             })
             .catch((error: Error) => {
                 DeviceTracker.log.error(error.message);
@@ -47,6 +56,7 @@ export class DeviceTracker extends Mw {
     }
 
     private sendDeviceMessage = (device: GoogDeviceDescriptor): void => {
+        if (!this.canAccess(device.udid)) return;
         const data: DeviceTrackerEvent<GoogDeviceDescriptor> = {
             device,
             id: this.id,
@@ -58,6 +68,10 @@ export class DeviceTracker extends Mw {
             data,
         });
     };
+
+    private canAccess(udid: string): boolean {
+        return canAccessDevice(this.userId, udid);
+    }
 
     private buildAndSendMessage = (list: GoogDeviceDescriptor[]): void => {
         const data: DeviceTrackerEventList<GoogDeviceDescriptor> = {
@@ -78,6 +92,10 @@ export class DeviceTracker extends Mw {
             command = ControlCenterCommand.fromJSON(event.data.toString());
         } catch (error: any) {
             DeviceTracker.log.error(`Received message: ${event.data}. Error: ${error?.message}`);
+            return;
+        }
+        if (!command.getUdid() || !this.canAccess(command.getUdid())) {
+            DeviceTracker.log.error(`Denied device command for user ${this.userId}`);
             return;
         }
         this.adt.runCommand(command).catch((e) => {

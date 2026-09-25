@@ -21,7 +21,7 @@ describe('openDatabase', () => {
         expect(fs.existsSync(p)).toBe(true);
         expect((db.prepare('PRAGMA journal_mode').get() as { journal_mode: string }).journal_mode).toBe('wal');
         expect((db.prepare('PRAGMA foreign_keys').get() as { foreign_keys: number }).foreign_keys).toBe(1);
-        expect((db.prepare('PRAGMA user_version').get() as { user_version: number }).user_version).toBe(1);
+        expect((db.prepare('PRAGMA user_version').get() as { user_version: number }).user_version).toBe(2);
         db.close();
     });
 
@@ -34,7 +34,7 @@ describe('openDatabase', () => {
         const nested = path.join(base, 'does', 'not', 'exist', 'yet', 'wsscrcpy.db');
         const db = openDatabase(nested);
         expect(fs.existsSync(nested)).toBe(true);
-        expect((db.prepare('PRAGMA user_version').get() as { user_version: number }).user_version).toBe(1);
+        expect((db.prepare('PRAGMA user_version').get() as { user_version: number }).user_version).toBe(2);
         db.close();
     });
 

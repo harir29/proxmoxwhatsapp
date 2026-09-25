@@ -314,17 +314,48 @@ window.onload = async (): Promise<void> => {
     const { WebCodecsPlayer } = await import('./player/WebCodecsPlayer');
     StreamClientScrcpy.registerPlayer(WebCodecsPlayer);
 
+    type AuthMe = {
+        authEnabled: boolean;
+        oidcEnabled?: boolean;
+        user: { role: 'user' | 'admin' } | null;
+        devices?: string[];
+        defaultDevice?: string | null;
+    };
+    const authState = await fetch('/api/auth/me')
+        .then((response) => (response.ok ? (response.json() as Promise<AuthMe>) : undefined))
+        .catch(() => undefined);
+
     // The normal root URL is a dedicated reDroid/WhatsApp entry point.
     // Start it directly instead of waiting for HostTracker to discover the
     // device and construct a dashboard card. ?dashboard=1 retains the full UI.
+    const accessControlled = authState?.authEnabled === true;
+    const isAdmin = authState?.user?.role === 'admin';
+    const requestedDevice = startupParams.get('device');
+    const assignedDevices = authState?.devices || [];
+    const requestedDeviceAllowed =
+        !accessControlled || isAdmin || (requestedDevice !== null && assignedDevices.includes(requestedDevice));
+    const directUdid =
+        requestedDevice && requestedDeviceAllowed
+            ? requestedDevice
+            : accessControlled
+              ? authState?.defaultDevice || null
+              : '127.0.0.1:5555';
     const directStream =
         !action &&
         startupParams.get('dashboard') !== '1' &&
-        startupParams.get('resume') !== 'uninstall-service';
+        startupParams.get('resume') !== 'uninstall-service' &&
+        (!accessControlled || !isAdmin) &&
+        directUdid !== null;
+
+    if (!directStream) {
+        document.body.dataset['disableAutoConnect'] = 'true';
+        revealAutoStreamDashboard();
+    }
 
     if (directStream) {
-        const udid = startupParams.get('device') || '127.0.0.1:5555';
-        const label = startupParams.get('label') || 'WhatsApp Test 01';
+        const udid = directUdid!;
+        const deviceNumber = Number.parseInt(udid.split(':').at(-1) || '', 10) - 5554;
+        const label = startupParams.get('label') || (deviceNumber > 0 ? `WhatsApp User ${deviceNumber}` : 'WhatsApp');
 
         try {
             const params = StreamClientScrcpy.parseParameters(

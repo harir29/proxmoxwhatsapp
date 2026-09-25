@@ -64,7 +64,13 @@ describe('AuthApi', () => {
         setAuthEnabled(Config.getInstance().db, true);
         const r = makeReqRes('GET', '/api/auth/me');
         await new AuthApi().handle(r.req, r.res);
-        expect(r.getJson()).toEqual({ authEnabled: true, user: null });
+        expect(r.getJson()).toEqual({
+            authEnabled: true,
+            oidcEnabled: false,
+            user: null,
+            devices: [],
+            defaultDevice: null,
+        });
     });
     it('change-password rejects a wrong current password (400)', async () => {
         setup();

@@ -2,6 +2,7 @@ import Protocol from '../../../common/AdbProtocol';
 import { ChannelCode } from '../../../common/ChannelCode';
 import type { Multiplexer } from '../../../packages/multiplexer/Multiplexer';
 import { Logger } from '../../Logger';
+import { canAccessDevice } from '../../auth/deviceAccess';
 import { Mw } from '../../mw/Mw';
 import { AdbUtils } from '../AdbUtils';
 import { FilePushReader } from '../filePush/FilePushReader';
@@ -11,7 +12,12 @@ export class FileListing extends Mw {
     private static readonly log = Logger.for('FileListing');
     protected override name = 'FileListing';
 
-    public static override processChannel(ws: Multiplexer, code: string, data: ArrayBuffer): Mw | undefined {
+    public static override processChannel(
+        ws: Multiplexer,
+        code: string,
+        data: ArrayBuffer,
+        userId: number,
+    ): Mw | undefined {
         // Only log channels WE handle (FSLS). The Mw framework calls every registered
         // processChannel with every code, so logging before this guard spammed the log
         // with other middlewares' codes (HSTS/GTRC) on every page load — even with no
@@ -27,6 +33,10 @@ export class FileListing extends Mw {
         const buffer = Buffer.from(data);
         const length = buffer.readInt32LE(0);
         const serial = new TextDecoder().decode(buffer.slice(4, 4 + length));
+        if (!canAccessDevice(userId, serial)) {
+            ws.close(4403, 'device access denied');
+            return;
+        }
         FileListing.log.info(`processChannel: accepted for serial="${serial}"`);
         return new FileListing(ws, serial);
     }

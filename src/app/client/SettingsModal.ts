@@ -419,6 +419,7 @@ export function buildResetControl(opts: { reload: () => void }): {
 export class SettingsModal extends Modal {
     private role: Role | null = null;
     private authEnabled = false;
+    private oidcEnabled = false;
     private serviceSection!: HTMLElement;
     private webPortInput: HTMLInputElement | null = null;
     private webPortStatus: HTMLElement | null = null;
@@ -462,15 +463,18 @@ export class SettingsModal extends Modal {
             void (async () => {
                 let role: Role | null = 'admin';
                 let authEnabled = false;
+                let oidcEnabled = false;
                 try {
                     const me = await authClient.me();
                     role = me.user?.role ?? null;
                     authEnabled = me.authEnabled;
+                    oidcEnabled = me.oidcEnabled === true;
                 } catch {
                     role = 'admin';
                 }
                 this.role = role;
                 this.authEnabled = authEnabled;
+                this.oidcEnabled = oidcEnabled;
                 this.fillBody(this.bodyEl);
                 if (canSeeSection(role, 'service')) void this.refreshService();
                 if (canSeeSection(role, 'updates')) void this.refreshUpdates();
@@ -586,7 +590,11 @@ export class SettingsModal extends Modal {
         toggleStatus.style.gridColumn = '1 / -1';
         toggleStatus.hidden = true;
 
-        if (this.authEnabled) {
+        if (this.oidcEnabled) {
+            const provider = document.createElement('span');
+            provider.textContent = 'Keycloak (OIDC)';
+            body.appendChild(this.buildRow('login', provider));
+        } else if (this.authEnabled) {
             const disableBtn = document.createElement('button');
             disableBtn.type = 'button';
             disableBtn.className = 'modal-button';
@@ -657,7 +665,7 @@ export class SettingsModal extends Modal {
         //     form with current + new password inputs, each with an eye toggle.
         //     On save → authClient.changePassword(); on success collapse the form;
         //     on failure show inline status. Never throws.
-        if (this.authEnabled) {
+        if (this.authEnabled && !this.oidcEnabled) {
             const cpStatus = document.createElement('p');
             cpStatus.className = 'settings-status';
             cpStatus.style.gridColumn = '1 / -1';
@@ -773,8 +781,11 @@ export class SettingsModal extends Modal {
             body.appendChild(this.buildRow('password', cpControl));
             body.appendChild(cpStatus);
 
-            // Logout — user-level, only when authEnabled (you're only logged in when
-            // auth is enabled). Placed adjacent to change-password. Not admin-gated.
+        }
+
+        // Logout is available for both local and Keycloak sessions. OIDC logout
+        // navigates through Keycloak so its SSO cookie is cleared too.
+        if (this.authEnabled) {
             const logoutStatus = document.createElement('p');
             logoutStatus.className = 'settings-status';
             logoutStatus.style.gridColumn = '1 / -1';
@@ -788,7 +799,8 @@ export class SettingsModal extends Modal {
             logoutBtn.addEventListener('click', () => {
                 void (async () => {
                     try {
-                        await authClient.logout();
+                        await authClient.logout(this.oidcEnabled);
+                        if (this.oidcEnabled) return;
                     } catch {
                         logoutStatus.textContent = 'logout request failed — reloading anyway.';
                         logoutStatus.hidden = false;

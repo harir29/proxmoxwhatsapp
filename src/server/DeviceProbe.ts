@@ -5,6 +5,7 @@ import { DEVICE_SERVER_PATH, SERVER_PACKAGE } from '../common/Constants';
 import type { ProbeResult } from '../common/ProbeResult';
 import { AdbClient } from './AdbClient';
 import { Config } from './Config';
+import { requireWsDeviceAccess } from './auth/deviceAccess';
 import { ensureScrcpyServerPushed } from './ensureScrcpyServerPushed';
 import { ControlCenter } from './goog-device/services/ControlCenter';
 import { parseWmDensity, parseWmSize } from './goog-device/wmParsers';
@@ -54,6 +55,7 @@ export class DeviceProbe extends Mw {
             ws.close(4003, '[DeviceProbe] Missing "udid" parameter');
             return;
         }
+        if (!requireWsDeviceAccess(ws, params.userId, udid)) return;
         return new DeviceProbe(ws, udid);
     }
 

@@ -1,5 +1,6 @@
 import type { IncomingMessage, ServerResponse } from 'http';
 import { resolveUserId } from '../auth/currentUser';
+import { requireDeviceAccess } from '../auth/deviceAccess';
 import { Config } from '../Config';
 import { Logger } from '../Logger';
 import { readJsonBody } from './utils';
@@ -64,6 +65,7 @@ export class SettingsApi {
                     res.end(JSON.stringify({ error: 'udid is required' }));
                     return true;
                 }
+                if (!requireDeviceAccess(req, res, udid)) return true;
                 if (req.method === 'GET') {
                     res.writeHead(200);
                     res.end(JSON.stringify(db.devices.getDeviceSettings(userId, udid)));

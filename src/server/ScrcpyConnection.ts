@@ -8,6 +8,7 @@ import { DEVICE_SERVER_PATH, SERVER_PACKAGE } from '../common/Constants';
 import { AUDIO_DISABLED, AUDIO_ERROR, codecName } from '../common/ScrcpyCodec';
 import { AdbClient } from './AdbClient';
 import { Config } from './Config';
+import { requireWsDeviceAccess } from './auth/deviceAccess';
 import { ensureScrcpyServerPushed } from './ensureScrcpyServerPushed';
 import { FrameReader } from './FrameReader';
 import { ControlCenter } from './goog-device/services/ControlCenter';
@@ -64,6 +65,7 @@ export class ScrcpyConnection extends Mw {
             ws.close(4003, '[ScrcpyConnection] Missing "udid" parameter');
             return;
         }
+        if (!requireWsDeviceAccess(ws, params.userId, udid)) return;
         const connection = new ScrcpyConnection(ws, udid, url.searchParams);
         return connection;
     }

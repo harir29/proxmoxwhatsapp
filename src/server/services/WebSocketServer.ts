@@ -1,6 +1,6 @@
 import type WS from 'ws';
 import { WebSocketServer as WSServer } from 'ws';
-import { isAuthEnabled, parseCookie, SESSION_COOKIE } from '../auth/authState';
+import { isAccessControlEnabled, parseCookie, SESSION_COOKIE } from '../auth/authState';
 import { SessionStore } from '../auth/session';
 import { Config } from '../Config';
 import { IMPLICIT_ADMIN_ID } from '../db/constants';
@@ -17,7 +17,7 @@ import type { Service } from './Service';
  * (→ the caller closes the socket). Exported for unit testing without a live socket.
  */
 export function wsSessionUserId(db: Db, cookieHeader: string | undefined): number | undefined {
-    if (!isAuthEnabled(db)) return IMPLICIT_ADMIN_ID;
+    if (!isAccessControlEnabled(db)) return IMPLICIT_ADMIN_ID;
     const token = parseCookie(cookieHeader)[SESSION_COOKIE];
     const s = token ? new SessionStore(db.sqlite).findValid(token, Date.now()) : undefined;
     if (!s) return undefined;
@@ -109,7 +109,7 @@ export class WebSocketServer implements Service {
             const action = url.searchParams.get('action') || '';
             let processed = false;
             for (const mwFactory of this.mwFactories.values()) {
-                const service = mwFactory.processRequest(ws, { action, request, url });
+                const service = mwFactory.processRequest(ws, { action, request, url, userId });
                 if (service) {
                     processed = true;
                 }
