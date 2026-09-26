@@ -21,6 +21,10 @@ import { onPageTeardown } from './util/onPageTeardown';
 // Hide the management dashboard while the default reDroid stream opens.
 const startupParams = new URLSearchParams(location.search);
 const autoStreamCover = document.getElementById('auto-stream-cover');
+let autoStreamPageLeaving = false;
+onPageTeardown(() => {
+    autoStreamPageLeaving = true;
+});
 
 const revealAutoStreamDashboard = (): void => {
     autoStreamCover?.remove();
@@ -378,9 +382,9 @@ window.onload = async (): Promise<void> => {
                 label,
                 'phone',
                 () => {
-                    window.location.assign(
-                        `${window.location.pathname}?dashboard=1`,
-                    );
+                    if (!autoStreamPageLeaving) {
+                        window.location.assign(`${window.location.pathname}?dashboard=1`);
+                    }
                 },
             );
 
