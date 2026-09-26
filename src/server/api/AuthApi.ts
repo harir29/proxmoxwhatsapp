@@ -15,7 +15,10 @@ import { requireAdmin } from '../auth/requireAdmin';
 import { SessionStore } from '../auth/session';
 import { Config } from '../Config';
 import { IMPLICIT_ADMIN_ID } from '../db/constants';
+import { Logger } from '../Logger';
 import { readJsonBody } from './utils';
+
+const log = Logger.for('AuthApi');
 
 function sendJson(res: ServerResponse, status: number, body: unknown): void {
     res.writeHead(status, { 'content-type': 'application/json' });
@@ -63,7 +66,9 @@ export class AuthApi {
                 res.setHeader('Set-Cookie', sessionCookie(token, secure));
                 res.writeHead(302, { location: result.returnTo, 'cache-control': 'no-store' });
                 res.end();
-            } catch {
+            } catch (error) {
+                const message = error instanceof Error ? error.message : String(error);
+                log.warn(`OIDC callback failed: ${message}`);
                 sendJson(res, 403, { error: 'OIDC login failed or account is not authorized' });
             }
             return true;

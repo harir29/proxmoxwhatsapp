@@ -80,6 +80,11 @@ describe('instanceToken', () => {
             expect(requiresToken('HEAD', '/api/config')).toBe(false);
         });
 
+        it('exempts only GET for the cross-site OIDC callback', () => {
+            expect(requiresToken('GET', '/api/auth/oidc/callback')).toBe(false);
+            expect(requiresToken('POST', '/api/auth/oidc/callback')).toBe(true);
+        });
+
         it('does not require a token for static (non-API) requests', () => {
             expect(requiresToken('GET', '/')).toBe(false);
             expect(requiresToken('GET', '/bundle.js')).toBe(false);

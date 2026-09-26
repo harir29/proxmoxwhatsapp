@@ -79,6 +79,14 @@ export function requiresToken(method: string | undefined, pathname: string): boo
         return false;
     }
     const m = (method ?? 'GET').toUpperCase();
+
+    // The authorization response is a cross-site top-level redirect from
+    // Keycloak, so SameSite=Strict intentionally withholds the instance-token
+    // cookie. OIDC state + PKCE protect this exact callback endpoint.
+    if (m === 'GET' && pathname === '/api/auth/oidc/callback') {
+        return false;
+    }
+
     if ((m === 'GET' || m === 'HEAD') && pathname === '/api/config') {
         return false;
     }
