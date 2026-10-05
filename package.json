@@ -47,7 +47,7 @@
     "release-notes": "node scripts/extract-changelog.mjs $npm_package_version"
   },
   "dependencies": {
-    "velopack": "^1.2.0",
+    "velopack": "^1.2.161",
     "ws": "^8.21.3"
   },
   "optionalDependencies": {
