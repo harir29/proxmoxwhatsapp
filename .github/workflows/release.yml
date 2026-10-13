@@ -82,7 +82,7 @@ jobs:
       - name: Upload unsigned exes
         if: needs.prepare.outputs.signing_mode == 'signed'
         id: upload-unsigned-exes
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: unsigned-windows-exes
           path: |
@@ -122,7 +122,7 @@ jobs:
       - name: Upload unsigned MSI
         if: needs.prepare.outputs.signing_mode == 'signed'
         id: upload-unsigned-msi
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: unsigned-windows-msi
           path: Releases/*.msi
@@ -148,7 +148,7 @@ jobs:
             Releases/*-Portable.zip
             Releases/*.nupkg
 
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: windows-final
           path: |
@@ -199,7 +199,7 @@ jobs:
       - name: Upload unsigned AppImage
         if: needs.prepare.outputs.signing_mode == 'signed'
         id: upload-unsigned-appimage
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: unsigned-linux-appimage
           path: Releases/*.AppImage
@@ -220,7 +220,7 @@ jobs:
         with:
           subject-path: 'Releases/*.AppImage'
 
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: linux-final
           path: |
